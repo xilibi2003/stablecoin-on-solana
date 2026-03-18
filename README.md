@@ -25,7 +25,7 @@ rYXfi25x9JMgau82aGMJMVUokq7JzueqehiJUmwR97Q
 
 - [Rust](https://rustup.rs/)（所需版本见 `rust-toolchain.toml`）
 - [Solana CLI](https://solana.com/developers/guides/getstarted/setup-local-development)
-- [Anchor CLI](https://www.anchor-lang.com/docs/installation) v1.0.0-rc.2
+- [Anchor CLI](https://www.anchor-lang.com/docs/installation) 0.32.1
 
 ## 构建
 

@@ -11,8 +11,8 @@ declare_id!("rYXfi25x9JMgau82aGMJMVUokq7JzueqehiJUmwR97Q");
 pub mod stablecoin {
     use super::*;
 
-    /// Initialize the stablecoin mint and config
-    /// This creates a new Token-2022 mint with the program PDA as the mint authority
+    /// 初始化稳定币的 mint 和配置账户
+    /// 这里会创建一个新的 Token-2022 mint，并把程序 PDA 设置为 mint authority
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let config = &mut ctx.accounts.config;
         config.admin = ctx.accounts.admin.key();
@@ -24,13 +24,13 @@ pub mod stablecoin {
         Ok(())
     }
 
-    /// Configure a minter with a specific allowance
-    /// Only the admin can call this instruction
-    /// If the minter already exists, this updates their allowance
+    /// 为某个 minter 配置指定的铸造额度
+    /// 只有 admin 可以调用这个指令
+    /// 如果该 minter 已存在，则更新其 allowance
     pub fn configure_minter(ctx: Context<ConfigureMinter>, allowance: u64) -> Result<()> {
         let minter_config = &mut ctx.accounts.minter_config;
 
-        // If not initialized, set the minter address
+        // 如果该配置账户尚未初始化，则写入 minter 地址和初始状态
         if !minter_config.is_initialized {
             minter_config.minter = ctx.accounts.minter.key();
             minter_config.amount_minted = 0;
@@ -45,24 +45,25 @@ pub mod stablecoin {
         Ok(())
     }
 
-    /// Remove a minter's authorization
-    /// Only the admin can call this instruction
-    /// This closes the minter config account and returns rent to admin
+    /// 移除某个 minter 的授权
+    /// 只有 admin 可以调用这个指令
+    /// 这里不是删除 minter 这个账户本身，而是关闭该 minter 对应的配置账户 `minter_config`
+    /// `minter_config` 被关闭后，rent 会退回给 admin，后续该 minter 也无法再通过授权校验进行 mint
     pub fn remove_minter(_ctx: Context<RemoveMinter>) -> Result<()> {
         msg!("Minter removed");
         Ok(())
     }
 
-    /// Mint new stablecoins to a user
-    /// Only authorized minters can call this instruction
-    /// The minter must have sufficient allowance remaining
+    /// 给用户铸造新的稳定币
+    /// 只有已授权的 minter 可以调用这个指令
+    /// 该 minter 必须还有足够的剩余额度
     pub fn mint_tokens(ctx: Context<MintTokens>, amount: u64) -> Result<()> {
         let config = &ctx.accounts.config;
 
-        // Check not paused
+        // 检查当前是否处于暂停状态
         require!(!config.paused, StablecoinError::Paused);
 
-        // Check and update minter allowance
+        // 检查并更新 minter 的已铸造额度
         let minter_config = &mut ctx.accounts.minter_config;
         let remaining = minter_config.allowance.checked_sub(minter_config.amount_minted)
             .ok_or(StablecoinError::ExceedsAllowance)?;
@@ -71,10 +72,10 @@ pub mod stablecoin {
         minter_config.amount_minted = minter_config.amount_minted.checked_add(amount)
             .ok_or(StablecoinError::Overflow)?;
 
-        // Create the signer seeds for the mint authority PDA
+        // 为 mint authority PDA 组装签名 seeds
         let signer_seeds: &[&[&[u8]]] = &[&[b"config", &[config.bump]]];
 
-        // Mint tokens to the destination account via Token-2022
+        // 通过 Token-2022 CPI 把代币铸造到目标账户
         mint_to(
             CpiContext::new_with_signer(
                 anchor_spl::token_2022::ID,
@@ -93,9 +94,9 @@ pub mod stablecoin {
         Ok(())
     }
 
-    /// Burn stablecoins from the caller's account
-    /// Anyone can burn their own tokens
-    /// In a real stablecoin, this would be called when users redeem for fiat
+    /// 从调用者自己的代币账户中销毁稳定币
+    /// 任何人都可以销毁自己持有的代币
+    /// 在真实稳定币场景中，这通常对应用户赎回法币时的销毁操作
     pub fn burn_tokens(ctx: Context<BurnTokens>, amount: u64) -> Result<()> {
         burn(
             CpiContext::new(
@@ -114,16 +115,16 @@ pub mod stablecoin {
         Ok(())
     }
 
-    /// Pause all minting operations
-    /// Only the admin can call this instruction
+    /// 暂停所有 mint 操作
+    /// 只有 admin 可以调用这个指令
     pub fn pause(ctx: Context<Pause>) -> Result<()> {
         ctx.accounts.config.paused = true;
         msg!("Stablecoin paused");
         Ok(())
     }
 
-    /// Unpause minting operations
-    /// Only the admin can call this instruction
+    /// 恢复 mint 操作
+    /// 只有 admin 可以调用这个指令
     pub fn unpause(ctx: Context<Unpause>) -> Result<()> {
         ctx.accounts.config.paused = false;
         msg!("Stablecoin unpaused");
@@ -132,44 +133,44 @@ pub mod stablecoin {
 }
 
 // ============================================================================
-// Account Structures
+// 账户结构
 // ============================================================================
 
-/// Config account that stores the stablecoin configuration
+/// 存储稳定币全局配置的账户
 #[account]
 #[derive(InitSpace)]
 pub struct Config {
-    /// The admin who can configure minters
+    /// 管理员是谁
     pub admin: Pubkey,
-    /// The mint address of the stablecoin
+    /// 稳定币 mint 地址
     pub mint: Pubkey,
-    /// Whether minting is paused
+    /// 是否暂停
     pub paused: bool,
-    /// Bump seed for the config PDA
+    /// PDA bump 信息，后续 PDA 作为 mint authority 签名时会使用
     pub bump: u8,
-    /// Bump seed for the mint PDA
+    /// mint PDA 对应的 bump seed
     pub mint_bump: u8,
 }
 
-/// Minter configuration account
-/// Each authorized minter has their own config with an allowance
+/// minter 的配置账户
+/// 每个被授权的 minter 都有自己独立的配置和额度
 #[account]
 #[derive(InitSpace)]
 pub struct MinterConfig {
-    /// The minter's public key
+    /// minter 的公钥
     pub minter: Pubkey,
-    /// Maximum amount the minter can mint (total)
+    /// 该 minter 总共最多可以铸造的数量
     pub allowance: u64,
-    /// Amount already minted by this minter
+    /// 该 minter 已经铸造过的数量
     pub amount_minted: u64,
-    /// Whether this account has been initialized
+    /// 该账户是否已经初始化
     pub is_initialized: bool,
-    /// Bump seed for this PDA
+    /// 该 PDA 对应的 bump seed
     pub bump: u8,
 }
 
 // ============================================================================
-// Instruction Contexts
+// 指令上下文
 // ============================================================================
 
 #[derive(Accounts)]
@@ -177,7 +178,7 @@ pub struct Initialize<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
 
-    /// The config account that stores stablecoin settings
+    /// 存储稳定币配置的 config 账户
     #[account(
         init,
         payer = admin,
@@ -187,8 +188,8 @@ pub struct Initialize<'info> {
     )]
     pub config: Account<'info, Config>,
 
-    /// The Token-2022 stablecoin mint
-    /// The config PDA is set as both mint authority and freeze authority
+    /// Token-2022 稳定币 mint 账户
+    /// 这里把 config PDA 同时设置为 mint authority 和 freeze authority
     #[account(
         init,
         payer = admin,
@@ -206,7 +207,7 @@ pub struct Initialize<'info> {
 
 #[derive(Accounts)]
 pub struct ConfigureMinter<'info> {
-    /// Only the admin can configure minters
+    /// 只有 admin 可以配置 minter
     #[account(
         mut,
         constraint = admin.key() == config.admin @ StablecoinError::Unauthorized
@@ -219,11 +220,11 @@ pub struct ConfigureMinter<'info> {
     )]
     pub config: Account<'info, Config>,
 
-    /// The minter being configured
-    /// CHECK: This can be any account that will be authorized to mint
+    /// 被配置的 minter
+    /// CHECK: 这里只需要它的地址来推导 PDA；任何将被授权 mint 的账户都可以
     pub minter: UncheckedAccount<'info>,
 
-    /// The minter's configuration account
+    /// 该 minter 对应的配置账户
     #[account(
         init_if_needed,
         payer = admin,
@@ -238,7 +239,7 @@ pub struct ConfigureMinter<'info> {
 
 #[derive(Accounts)]
 pub struct RemoveMinter<'info> {
-    /// Only the admin can remove minters
+    /// 只有 admin 可以移除 minter
     #[account(
         mut,
         constraint = admin.key() == config.admin @ StablecoinError::Unauthorized
@@ -251,11 +252,14 @@ pub struct RemoveMinter<'info> {
     )]
     pub config: Account<'info, Config>,
 
-    /// The minter being removed
-    /// CHECK: This is the minter whose config is being closed
+    /// 要被移除授权的 minter
+    /// CHECK: 这里只使用它的公钥来定位对应的 `minter_config` PDA，不检查账户内部数据
     pub minter: UncheckedAccount<'info>,
 
-    /// The minter's configuration account to close
+    /// 要关闭的 minter 配置账户
+    /// 通过 `seeds = [b"minter", minter.key().as_ref()]` 约束，确保它确实属于这个 minter
+    /// 通过 `close = admin` 在指令成功后自动关闭该账户，并把 rent 退回给 admin
+    /// minter 被“移除”的本质，就是这个授权配置账户被关闭，而不是 `minter` 账户本身被删除
     #[account(
         mut,
         close = admin,
@@ -267,18 +271,18 @@ pub struct RemoveMinter<'info> {
 
 #[derive(Accounts)]
 pub struct MintTokens<'info> {
-    /// The minter calling this instruction
+    /// 发起本次 mint 的 minter
     #[account(mut)]
     pub minter: Signer<'info>,
 
-    /// The config account
+    /// 全局配置账户
     #[account(
         seeds = [b"config"],
         bump = config.bump
     )]
     pub config: Account<'info, Config>,
 
-    /// The minter's configuration - verifies they are authorized
+    /// 该 minter 对应的配置账户，用来校验其是否已被授权
     #[account(
         mut,
         seeds = [b"minter", minter.key().as_ref()],
@@ -287,7 +291,7 @@ pub struct MintTokens<'info> {
     )]
     pub minter_config: Account<'info, MinterConfig>,
 
-    /// The Token-2022 stablecoin mint
+    /// Token-2022 稳定币 mint 账户
     #[account(
         mut,
         seeds = [b"mint"],
@@ -295,7 +299,7 @@ pub struct MintTokens<'info> {
     )]
     pub mint: InterfaceAccount<'info, Mint>,
 
-    /// The destination Token-2022 token account (ATA) to mint to
+    /// 接收铸造代币的 Token-2022 ATA 账户
     #[account(
         init_if_needed,
         payer = minter,
@@ -305,7 +309,7 @@ pub struct MintTokens<'info> {
     )]
     pub destination: InterfaceAccount<'info, TokenAccount>,
 
-    /// CHECK: The owner of the destination token account
+    /// CHECK: 目标代币账户的 owner，只用于创建/校验 ATA
     pub destination_owner: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token2022>,
@@ -315,17 +319,17 @@ pub struct MintTokens<'info> {
 
 #[derive(Accounts)]
 pub struct BurnTokens<'info> {
-    /// The owner of the token account burning tokens
+    /// 发起销毁操作的代币账户 owner
     pub owner: Signer<'info>,
 
-    /// The config account
+    /// 全局配置账户
     #[account(
         seeds = [b"config"],
         bump = config.bump
     )]
     pub config: Account<'info, Config>,
 
-    /// The Token-2022 stablecoin mint
+    /// Token-2022 稳定币 mint 账户
     #[account(
         mut,
         seeds = [b"mint"],
@@ -333,7 +337,7 @@ pub struct BurnTokens<'info> {
     )]
     pub mint: InterfaceAccount<'info, Mint>,
 
-    /// The Token-2022 token account to burn from
+    /// 要从中销毁代币的 Token-2022 代币账户
     #[account(
         mut,
         associated_token::mint = mint,
@@ -347,7 +351,7 @@ pub struct BurnTokens<'info> {
 
 #[derive(Accounts)]
 pub struct Pause<'info> {
-    /// Only the admin can pause
+    /// 只有 admin 可以暂停
     #[account(
         constraint = admin.key() == config.admin @ StablecoinError::Unauthorized
     )]
@@ -363,7 +367,7 @@ pub struct Pause<'info> {
 
 #[derive(Accounts)]
 pub struct Unpause<'info> {
-    /// Only the admin can unpause
+    /// 只有 admin 可以恢复
     #[account(
         constraint = admin.key() == config.admin @ StablecoinError::Unauthorized
     )]
@@ -378,7 +382,7 @@ pub struct Unpause<'info> {
 }
 
 // ============================================================================
-// Error Codes
+// 错误码
 // ============================================================================
 
 #[error_code]
