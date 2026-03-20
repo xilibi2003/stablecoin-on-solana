@@ -85,25 +85,25 @@ allowance: u64  — 该铸币人的累计铸币上限
 
 ### `Config` — PDA seeds: `["config"]`
 
-| 字段        | 类型     | 说明                          |
-| ----------- | -------- | ----------------------------- |
-| `admin`     | `Pubkey` | 可以管理铸币人并执行暂停/恢复 |
-| `mint`      | `Pubkey` | Token-2022 mint 地址          |
-| `paused`    | `bool`   | 为 `true` 时禁止铸币          |
-| `bump`      | `u8`     | PDA bump seed                 |
-| `mint_bump` | `u8`     | mint PDA bump seed            |
+| 字段        | 类型     | 说明                                                             |
+| ----------- | -------- | ---------------------------------------------------------------- |
+| `admin`     | `Pubkey` | 可以管理铸币人并执行暂停/恢复                                    |
+| `mint`      | `Pubkey` | Token-2022 mint 地址                                             |
+| `paused`    | `bool`   | 为 `true` 时禁止铸币                                             |
+| `bump`      | `u8`     | PDA bump seed                                                    |
+| `mint_bump` | `u8`     | `mint` PDA 的 bump，用于后续账户约束校验该 `mint` 是否为预期 PDA |
 
 同时作为 mint::authority
 
 ### `MinterConfig` — PDA seeds: `["minter", minter_pubkey]`
 
-| 字段             | 类型     | 说明                                      |
-| ---------------- | -------- | ----------------------------------------- |
-| `minter`         | `Pubkey` | 被授权的铸币人公钥                        |
-| `allowance`      | `u64`    | 该铸币人一生中最多可铸造的代币数量        |
-| `amount_minted`  | `u64`    | 该铸币人已累计铸造的代币数量              |
-| `is_initialized` | `bool`   | 在首次调用 `configure_minter` 时设为 true |
-| `bump`           | `u8`     | PDA bump seed                             |
+| 字段             | 类型     | 说明                                                                   |
+| ---------------- | -------- | ---------------------------------------------------------------------- |
+| `minter`         | `Pubkey` | 被授权的铸币人公钥                                                     |
+| `allowance`      | `u64`    | 该铸币人一生中最多可铸造的代币数量                                     |
+| `amount_minted`  | `u64`    | 该铸币人已累计铸造的代币数量                                           |
+| `is_initialized` | `bool`   | 在首次调用 `configure_minter` 时设为 true                              |
+| `bump`           | `u8`     | `minter_config` PDA 的 bump，用于后续账户约束校验它是否属于该 `minter` |
 
 ## Token-2022 说明
 

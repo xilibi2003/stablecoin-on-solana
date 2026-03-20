@@ -148,7 +148,8 @@ pub struct Config {
     pub paused: bool,
     /// PDA bump 信息，后续 PDA 作为 mint authority 签名时会使用
     pub bump: u8,
-    /// mint PDA 对应的 bump seed
+    /// mint PDA 对应的 bump seed。
+    /// 用于后续账户约束中重新校验是 `[b"mint"]` 推导出的 PDA
     pub mint_bump: u8,
 }
 
@@ -165,7 +166,9 @@ pub struct MinterConfig {
     pub amount_minted: u64,
     /// 该账户是否已经初始化
     pub is_initialized: bool,
-    /// 该 PDA 对应的 bump seed
+    /// `minter_config` PDA 对应的 bump seed。
+    /// 用于后续账户约束中重新校验当前传入的 `minter_config`
+    /// 是否确实是 `[b"minter", minter_pubkey]` 推导出的 PDA。
     pub bump: u8,
 }
 
